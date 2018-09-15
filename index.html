@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title> Prove sec. proj </title>
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	</head>
+
+	<body>
+
+        <script src="lib/three.min.js"></script>
+    		<script src="lib/stats.min.js"></script>
+    		<script src="lib/OrbitControls.js"></script>
+    		<script src='lib/dat.gui.min.js'></script>
+    		<script src="lib/GLTFLoader.js"></script>
+
+
+		<!-- shaders -->
+
+		<script type="text/x-glsl" id="vertex">
+		varying vec3 vNormal;
+		varying vec3 vPosition;
+		varying vec3 wPosition;
+		varying vec2 uVv;
+
+		void main() {
+			vec4 vPos = modelViewMatrix * vec4( position, 1.0 );
+			vPosition = vPos.xyz;
+			wPosition = (modelMatrix * vec4( position, 1.0 )).xyz;
+			vNormal = normalMatrix * normal;
+			uVv = uv;
+			gl_Position = projectionMatrix * vPos;
+		}
+		</script>
+
+    <!-- shaders per materiali uniformi e conduttivi. Vantaggio di una lettura da texture in meno(no diffuseMap) -->
+		<script type="text/x-glsl" id="fragment-metalness">
+
+			varying vec3 vNormal;
+			varying vec3 vPosition;
+			varying vec3 wPosition;
+			varying vec2 uVv;
+
+			uniform vec3 pointLightPosition1; // in world space
+      uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 clight1;
+      uniform vec3 clight2;
+
+			uniform sampler2D baseColor;      //used as specular color
+      uniform sampler2D roughnessMap;
+
+			uniform samplerCube envMap;
+      uniform samplerCube iEM;
+
+			const float PI = 3.14159;
+      const float metalness = 1.0;
+
+      float roughness;
+      vec3 cspec;
+      vec3 cMat; // base color
+
+
+      vec3 FSchlick(float lDoth) {
+				return (cspec + (vec3(1.0)-cspec)*pow(1.0 - lDoth,5.0));
+			}
+
+      float DGGX(float nDoth, float alpha) {
+				float alpha2 = alpha*alpha;
+				float d = nDoth*nDoth*(alpha2-1.0)+1.0;
+				return (  alpha2 / (PI*d*d));
+			}
+
+			float G1(float dotProduct, float k) {
+				return (dotProduct / (dotProduct*(1.0-k) + k) );
+			}
+
+			float GSmith(float nDotv, float nDotl) {
+					float k = roughness*roughness;
+					return G1(nDotl,k)*G1(nDotv,k);
+			}
+
+      vec3 BRDF_Specular_GGX_Environment(vec3 normal, vec3 viewDir, const in vec3 cspec, const in float roughness){
+        float NdotV = saturate(dot(normal, viewDir));
+        const vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
+        const vec4 c1 = vec4(1, 0.0425, 1.04, -0.04);
+        vec4 r = roughness * c0 + c1;
+        float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+        vec2 AB = vec2(-1.04, 1.04) * a004 + r.zw;
+        return cspec * AB.x + AB.y;
+      }
+
+			#extension GL_OES_standard_derivatives : enable
+
+  		vec3 inverseTransformDirection( in vec3 dir, in mat4 matrix ) {
+  			return normalize( ( vec4( dir, 0.0 ) * matrix ).xyz );
+  		}
+
+			void main() {
+
+        // material data
+        roughness = texture2D( roughnessMap, uVv ).x;
+        cMat = texture2D(baseColor, uVv).rgb;
+        cMat = pow( cMat, vec3(2.2));
+        cspec = mix(vec3(0.0), cMat, metalness);
+
+
+        vec3 v = normalize( -vPosition);
+				vec3 n = normalize( vNormal );  // interpolation destroys normalization, so we have to normalize
+        float nDotv = max(dot( n, v ),0.000001);
+
+
+        // about light 1
+        vec4 lPosition1 = viewMatrix * vec4( pointLightPosition1, 1.0 );
+        vec3 l1 = normalize(lPosition1.xyz - vPosition.xyz);
+        vec3 h1 = normalize(l1 + v);
+        float nDotl1 = max(dot( n, l1 ),0.000001);
+				float l1Doth1 = max(dot( l1, h1 ),0.000001);
+				float nDoth1 = max(dot( n, h1 ),0.000001);
+				float vDoth1 = max(dot( v, h1 ),0.000001);
+
+        vec3 fresnel_1 = FSchlick(l1Doth1);
+        vec3 BRDF1 = fresnel_1*GSmith(nDotv,nDotl1)*DGGX(nDoth1,roughness*roughness)/
+					(4.0*nDotl1*nDotv);
+				vec3 outRadiance1 = PI* clight1 * nDotl1 * BRDF1;
+
+        // about light 2
+        vec4 lPosition2 = viewMatrix * vec4( pointLightPosition2, 1.0 );
+        vec3 l2 = normalize(lPosition2.xyz - vPosition.xyz);
+        vec3 h2 = normalize(l2 + v);
+        float nDotl2 = max(dot( n, l2 ),0.000001);
+				float l2Doth2 = max(dot( l2, h2 ),0.000001);
+				float nDoth2 = max(dot( n, h2 ),0.000001);
+				float vDoth2 = max(dot( v, h2 ),0.000001);
+
+        vec3 fresnel_2 = FSchlick(l2Doth2);
+        vec3 BRDF2 = fresnel_2*GSmith(nDotv,nDotl2)*DGGX(nDoth2,roughness*roughness)/
+          (4.0*nDotl2*nDotv);
+        vec3 outRadiance2 = PI* clight2 * nDotl2 * BRDF2;
+
+        // about environment light
+				vec3 worldN = inverseTransformDirection( n, viewMatrix );
+				vec3 worldV = cameraPosition - wPosition ;
+				vec3 r = normalize( reflect(-worldV,worldN));
+        // negate x to account for how cubemap is displayed on background
+				vec3 envLight = textureCube( envMap, vec3(-r.x, r.yz)).rgb;
+				// texture in sRGB, linearize
+				envLight = pow( envLight, vec3(2.2));
+        vec3 outRadianceEnv = envLight * BRDF_Specular_GGX_Environment(n, v, cspec, roughness);
+
+        // total light
+        vec3 outRadiance = outRadiance1 + outRadiance2 + outRadianceEnv;
+				// gamma encode the final value
+				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
+			}
+
+		</script>
+
+    <!-- shaders per materiali uniformi e isolanti. Vantaggio di una lettura da texture in meno(no metalnessMap) -->
+		<script type="text/x-glsl" id="fragment-insulation">
+
+			varying vec3 vNormal;
+			varying vec3 vPosition;
+			varying vec3 wPosition;
+			varying vec2 uVv;
+
+			uniform vec2 normalScale;
+			uniform vec3 pointLightPosition1; // in world space
+      uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 clight1;
+      uniform vec3 clight2;
+
+			uniform sampler2D baseColor;      //used as specular color
+      uniform sampler2D roughnessMap;
+			uniform sampler2D metalnessMap;
+			uniform sampler2D normalMap;
+
+			uniform samplerCube envMap;
+      uniform samplerCube iEM;
+
+			const float PI = 3.14159;
+
+      float roughness;
+			float metalness;
+			vec3 cMat;
+      vec3 cdiff;
+			vec3 cspec;
+
+			vec3 FSchlick(float lDoth){
+				return (cspec + (vec3(1.0) - cspec) * pow(1.0 - lDoth, 0.5));
+			}
+
+			float DGGX(float nDoth, float alfa){
+				float alfa2 = alfa * alfa;
+				float d = nDoth * nDoth * (alfa2 - 1.0) + 1.0;
+				return (alfa2 / (PI * d * d));
+			}
+
+			float G1(float dotProduct, float k){
+				return (dotProduct / (dotProduct * (1.0 - k) + k));
+			}
+
+			float GSmith(float nDotv, float nDotl){
+				float k = roughness * roughness;
+				return (G1(nDotl, k) * G1(nDotv, k));
+			}
+
+    	#extension GL_OES_standard_derivatives : enable
+
+			vec3 perturbNormal2Arb( vec3 eye_pos, vec3 surf_norm ) {
+
+				vec3 q0 = dFdx( eye_pos.xyz );
+				vec3 q1 = dFdy( eye_pos.xyz );
+				vec2 st0 = dFdx( uVv.st );
+				vec2 st1 = dFdy( uVv.st );
+
+				vec3 S = normalize(  q0 * st1.t - q1 * st0.t );
+				vec3 T = normalize( -q0 * st1.s + q1 * st0.s );
+				vec3 N =  surf_norm ;
+
+				vec3 mapN = normalize(texture2D( normalMap, uVv ).xyz * 2.0 - 1.0);
+				mapN.xy = normalScale * mapN.xy;
+				mat3 tsn = mat3( S, T, N );
+				return normalize( tsn * mapN );
+
+			}
+
+  		vec3 inverseTransformDirection( in vec3 dir, in mat4 matrix ) {
+  			return normalize( ( vec4( dir, 0.0 ) * matrix ).xyz );
+  		}
+
+			void main() {
+
+        // material data
+        roughness = texture2D( roughnessMap, uVv ).x;
+				metalness = texture2D( metalnessMap, uVv ).x;
+        cMat = texture2D(baseColor, uVv).rgb;
+        cMat = pow( cMat, vec3(2.2));
+
+				cspec = mix(vec3(0.04), cMat, metalness);
+				cdiff = cMat;
+				//cdiff = mix(cMat, vec3(0.0), metalness);
+
+        vec3 v = normalize( -vPosition);
+				vec3 n = perturbNormal2Arb( vPosition, normalize( vNormal ));
+				float nDotv = max(dot(n, v), 0.000001);
+
+				// about environment light
+				vec3 worldN = inverseTransformDirection( n, viewMatrix );
+				vec3 worldV = cameraPosition - wPosition ;
+				vec3 r = normalize( reflect(-worldV,worldN));
+				// negate x to account for how cubemap is displayed on background
+				vec3 envLight = textureCube( iEM, vec3(-r.x, r.yz)).rgb;
+				// texture in sRGB, linearize
+				envLight = pow( envLight, vec3(2.2));
+
+
+        // about light 1
+        vec4 lPosition1 = viewMatrix * vec4( pointLightPosition1, 1.0 );
+				vec3 l1 = normalize(lPosition1.xyz - vPosition.xyz);
+				vec3 h1 = normalize(v + l1);
+				//small quantity to prevent division by 0
+				float nDotl1 = max(dot(n, l1), 0.000001);
+				float nDoth1 = max(dot(n, h1), 0.000001);
+				float l1Doth1 = max(dot(l1, h1), 0.000001);
+				float vDoth1 = max(dot(v, h1), 0.000001);
+
+				vec3 fresnel1 = FSchlick(l1Doth1);
+				vec3 BRDF_1 = (vec3(1.0)-fresnel1)*cdiff/PI + fresnel1*GSmith(nDotv,nDotl1)*DGGX(nDoth1,roughness*roughness)/
+					(4.0*nDotl1*nDotv);
+				vec3 outRadiance_1 = PI* clight1 * nDotl1 * BRDF_1;
+
+
+        // about light 2
+				vec4 lPosition2 = viewMatrix * vec4(pointLightPosition2, 1.0);
+				vec3 l2 = normalize(lPosition2.xyz - vPosition.xyz);
+				vec3 h2 = normalize(v + l2);
+				//small quantity to prevent division by 0
+				float nDotl2 = max(dot(n, l2), 0.000001);
+				float nDoth2 = max(dot(n, h2), 0.000001);
+				float l2Doth2 = max(dot(l2, h2), 0.000001);
+				float vDoth2 = max(dot(v, h2), 0.000001);
+
+				vec3 fresnel2 = FSchlick(l2Doth2);
+				vec3 BRDF_2 = (vec3(1.0)-fresnel2)*cdiff/PI + fresnel2*GSmith(nDotv,nDotl2)*DGGX(nDoth2,roughness*roughness)/
+					(4.0*nDotl2*nDotv);
+				vec3 outRadiance_2 = PI* clight2 * nDotl2 * BRDF_2;
+
+				vec3 outRadiance = (envLight * cdiff) +  outRadiance_1 +  outRadiance_2;
+				// gamma encode the final value
+				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
+			}
+
+		</script>
+
+
+
+		<!-- three.js code -->
+
+		<script>
+
+			var renderer = new THREE.WebGLRenderer( { antialias: true } );
+			var camera = new THREE.PerspectiveCamera( 35, window.innerWidth / window.innerHeight, 1, 1000 );
+			var scene = new THREE.Scene();
+      var controls = new THREE.OrbitControls( camera, renderer.domElement );
+      //LOADER MODELLO GLTF
+      var loader = new THREE.GLTFLoader();
+      //Array di 8 stringhe contenenti i nomi dei figli dell'oggetto GLTF
+      var objNames = ["becco","disegno","disegno","disegno","disegno","disegno","elmo","visiera"];
+
+
+			// loaders cubemap/envMap/texture
+			var cubeMapLoader = new THREE.CubeTextureLoader();
+      var tLoader = new THREE.TextureLoader();
+
+			// load irradiance map
+			cubeMapLoader.setPath( 'irradianceMap/vanc/' );
+			var irradianceMap = cubeMapLoader.load( [
+					'px.jpg', 'nx.jpg',
+					'py.jpg', 'ny.jpg',
+					'pz.jpg', 'nz.jpg'
+			] );
+      // Load background cube map
+      cubeMapLoader.setPath( 'envMap/vanc/' );
+			var envMap = cubeMapLoader.load( [
+					'px.jpg', 'nx.jpg',
+					'py.jpg', 'ny.jpg',
+					'pz.jpg', 'nz.jpg'
+			] );
+      scene.background = envMap;
+			envMap.minFilter = THREE.LinearMipMapLinearFilter;
+
+
+
+			//******** lights ****************************
+			var intensity_1 = 1.0;
+			var intensity_2 = 1.0;
+			var cLight_1 = new THREE.Vector3(1.0)*intensity_1;
+			var cLight_2 = new THREE.Vector3(1.0)*intensity_2;
+			var lPos_1 = new THREE.Vector3( 10, 10, -10 );
+			var lPos_2 = new THREE.Vector3( -10, 10, 10 );
+
+      var light1 = new THREE.PointLight( 0xffffff, 1, 100 );
+      light1.position.set( lPos_1 );
+      scene.add( light1 );
+      // Luce Standard appositamente per la visiera
+      var light2 = new THREE.PointLight( 0xffffff, 1, 100 );
+      light2.position.set( lPos_2 );
+      scene.add( light2 );
+
+
+      //********* MATERIALI **************************
+      vs = document.getElementById("vertex").textContent;
+			fs_metal = document.getElementById("fragment-metalness").textContent;
+      fs_ins = document.getElementById("fragment-insulation").textContent;
+
+
+      //DEFINIZIONE MATERIALI PERSONALIZZATI
+      materialExtensions = {
+        derivatives: true, //set to use derivatives
+        shaderTextureLOD: true //set to use shader texture LOD
+      }
+
+      // carbonio
+      var carbPath = "textures/carbonFiber/new/";
+
+      var fiberUniforms = {
+        baseColor: {type: "t", value: loadTexture(carbPath + "baseColor.png")},
+        normalMap: {type: "t", value: loadTexture(carbPath + "normalMap.png")},
+        roughnessMap: {type: "t", value: loadTexture(carbPath + "roughness.png")},
+				metalnessMap: {type: "t", value: loadTexture(carbPath + "metallic.png")},
+				normalScale: {type: "v2", value: new THREE.Vector2(1,1)},
+				pointLightPosition1: {type: "v3", value: new THREE.Vector3(10.0,10.0,-10.0)},
+        pointLightPosition2: {type: "v3", value: new THREE.Vector3(-10.0,10.0,10.0)},
+        clight1: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+        clight2: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+        envMap: {type: "t", value: envMap},
+        iEM: {type: "t", value: irradianceMap}
+      }
+      var carbonFiber2 = new THREE.ShaderMaterial({uniforms: fiberUniforms, vertexShader: vs, fragmentShader: fs_ins, extensions: materialExtensions});
+			var carbonFiber = new THREE.MeshStandardMaterial({map: tLoader.load(carbPath + 'baseColor.png'),
+			                                                  envMap: envMap,
+			                                                  metalness: 0.0,
+			                                                  normalMap: tLoader.load(carbPath + "normalMap.png"),
+			                                                  roughnessMap: tLoader.load(carbPath + 'roughness.png'),
+			                                                  side: THREE.DoubleSide});
+
+
+      // rame
+      var coPath = 'textures/copper/';
+      var copperUniforms = {
+        baseColor: {type: "t", value: loadTexture(coPath + "baseColor.png")},
+        roughnessMap: {type: "t", value: loadTexture(coPath + "roughness.png")},
+        pointLightPosition1: {type: "v3", value: new THREE.Vector3(10.0,10.0,-10.0)},
+        pointLightPosition2: {type: "v3", value: new THREE.Vector3(-10.0,10.0,10.0)},
+        clight1: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+        clight2: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+        envMap: {type: "t", value: envMap},
+        iEM: {type: "t", value: irradianceMap}
+      }
+      var copper = new THREE.ShaderMaterial({uniforms: copperUniforms, vertexShader: vs, fragmentShader: fs_metal, extensions: materialExtensions});
+      /*var copper = new THREE.MeshStandardMaterial({map: tLoader.load(coPath + 'albedo.png'),
+                                                  envMap: envMap,
+                                                  metalness: 0.8,
+                                                  displacementMap: tLoader.load(coPath + 'heightMap.png'),
+                                                  displacementScale: 0.01,
+                                                  roughnessMap: tLoader.load(coPath + 'roughness.png'),
+                                                  side: THREE.DoubleSide});*/
+    // oro
+    var gPath = 'textures/gold/';
+    var goldUniforms = {
+      baseColor: {type: "t", value: loadTexture(gPath + "baseColor.jpg")},
+      roughnessMap: {type: "t", value: loadTexture(gPath + "roughness.jpg")},
+      pointLightPosition1: {type: "v3", value: new THREE.Vector3(10.0,10.0,-10.0)},
+      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-10.0,10.0,10.0)},
+      clight1: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+      clight2: {type: "v3", value: new THREE.Vector3(1.0,1.0,1.0)},
+      envMap: {type: "t", value: envMap},
+      iEM: {type: "t", value: irradianceMap}
+    }
+    var gold = new THREE.ShaderMaterial({uniforms: goldUniforms, vertexShader: vs, fragmentShader: fs_metal, extensions: materialExtensions});
+    /*var gold = new THREE.MeshStandardMaterial({map:loadTexture(gPath + 'albedo.jpg'),
+                                                envMap: envMap,
+                                                metalnessMap:loadTexture(gPath + 'metalness.jpg'),
+                                                //normalMap: loadTexture("textures/gold/normal.jpg"),
+                                                roughnessMap: loadTexture(gPath + 'roughness.jpg'),
+                                                side: THREE.DoubleSide});*/
+
+      var mat1 = new THREE.MeshStandardMaterial({color: 0xeeeeee,
+                                                metalness: 0.8,
+                                                roughness: 0.3,
+                                                envMap: envMap,
+                                                side: THREE.DoubleSide});
+
+      var mat2 = new THREE.MeshStandardMaterial({color: 0xee8830,
+                                                metalness: 0.8,
+                                                roughness: 0.3,
+                                                envMap: envMap,
+                                                side: THREE.DoubleSide});
+
+      // Materiale standard per la visiera
+      var redGlass = new THREE.MeshStandardMaterial({ color: 0xcc3030,
+                                                      opacity: 0.9,
+                                                      transparent: true,
+                                                      side: THREE.DoubleSide});
+
+
+			function loadTexture(file) {
+					var texture = tLoader.load( file , function ( texture ) {
+						texture.minFilter = THREE.LinearMipMapLinearFilter;
+						texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+						texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+						texture.offset.set(0, 0);
+						texture.needsUpdate = true;
+						render();
+					} )
+					return texture;
+			}
+
+      function retriveMaterial(matName){
+
+        switch(matName){
+          case 'copper': return copper;
+          case 'oro': return gold;
+          case 'mat1': return mat1;
+					case 'carbonFiber': return carbonFiber;
+          default: return mat1;
+        }
+      }
+
+      function change(mat, part){
+        applyMaterial(retriveMaterial(mat), part);
+      }
+
+      function applyMaterial(material, name){
+
+        //Un po di debugging
+        console.log("scene length: " + scene.children.length);
+
+        for(let i = 0; i < scene.children.length; i++){
+          console.log("figlio scena n.ro: " + i);
+          console.log( scene.children[i]);
+        }
+
+
+        let b = 0;
+        let obj = scene.children[3];    //indicizzo il modello gltf  -- ?? scene.children - 1
+        console.log("Ho caricato: " + obj);
+
+        if(obj == undefined){
+          return;
+        }
+
+        console.log("Entro nel While");
+        while(!(obj.children.length == 8)){ //finchè non arrivo al nodo radice delle mesh
+          console.log("passo n.ro: " + b);
+          obj = obj.children[0];
+          b++;
+        }
+        for(let i = 0; i < obj.children.length; i++){
+          console.log("for n.ro: " + i);
+          if(obj.children[0].children[0].name == name){ //accedo al nipote, che contiene la mesh
+            console.log("trovato figlio!!");
+            obj.children[0].children[0].material = material;
+          }else{
+						console.log("figlio analizzato: " + obj.children[0].children[0].name );
+					}
+        }
+        render();
+      }
+
+      function loadModel(){
+
+        loader.load('kylo_ren_helmet/scene.gltf', function(gltf){
+          let i = 0;
+          gltf.scene.traverse( function ( child ) {
+            if(child.isMesh){
+
+                child.name = objNames[i];
+                console.log(child.name);
+                if(child.name == 'visiera'){
+                  child.material = redGlass;
+								}else if(child.name == 'elmo'){
+									child.material = carbonFiber;
+                }else{
+                  child.material = copper;
+                }
+                i++;
+            }
+          });
+          scene.add(gltf.scene);
+        });
+
+      }
+
+
+			function init() {
+
+        loadModel();
+
+				var mesh = new THREE.Mesh( new THREE.BoxGeometry(5,5,5), carbonFiber2);
+				mesh.position.set(5,5,5);
+				scene.add(mesh);
+
+				renderer.setClearColor( 0xf0f0f0 );
+
+				camera.position.set( 20, 10, 15 );
+				camera.lookAt(0,0,0);
+
+				scene.add(camera);
+
+        controls.minDistance = 1;
+				controls.maxDistance = 30;
+				controls.enablePan = true; //TODO: mettere false alla fine
+				controls.update();
+
+				document.body.appendChild( renderer.domElement );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				window.addEventListener( 'resize', onResize, false );
+
+      }
+
+
+			function onResize() {
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				camera.aspect = ( window.innerWidth / window.innerHeight );
+				camera.updateProjectionMatrix();
+
+			}
+
+
+			function update() {
+				requestAnimationFrame( update );
+				render();
+			}
+
+			function render() {
+				renderer.render( scene, camera );
+			}
+
+      init();
+      update();
+      render();
+
+  // *****************************
+
+        </script>
+	</body>
+</html>

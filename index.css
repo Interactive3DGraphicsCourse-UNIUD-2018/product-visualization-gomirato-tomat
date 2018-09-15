@@ -1,0 +1,185 @@
+html {
+    font-family: 'Roboto', sans-serif;
+}
+
+body {
+    background-color: #f0f0f0;
+    margin: 0px;
+    overflow: hidden;
+}
+
+.menuBtn {
+    font-size:30px;
+    cursor:pointer;
+    color: white;
+    position: fixed !important;
+    top: 2px;
+    left: 5px;
+    z-index: 1;
+    vertical-align: middle;
+    background-color: rgba(0,0,0,0.3) !important
+}
+
+.menuBtnOrder {
+    font-size:30px;
+    cursor:pointer;
+    color: white;
+    position: fixed !important;
+    top: 2px;
+    right: 5px;
+    z-index: 1;
+    vertical-align: middle;
+    background-color: rgba(0,0,0,0.3) !important
+}
+
+.overlay {
+    height: 100%;
+    width: 0;
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0, 0.9);
+    overflow-x: hidden;
+    transition: 0.5s;
+}
+
+.overlay-content {
+    position: relative;
+    left: 0;
+    top: 3%;
+    width: 100%;
+    text-align: center;
+}
+
+.overlay a {
+    padding: 8px;
+    text-decoration: none;
+    font-size: 36px;
+    color: #818181;
+    display: block;
+    transition: 0.3s;
+}
+
+.overlayTitle {
+
+    padding-top: 18px !important;
+    padding-left: 15px !important;
+    font-size: 30px !important;
+
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+}
+
+.overlay a:hover, .overlay a:focus {
+    color: #f1f1f1;
+}
+
+.overlay .closebtn {
+    position: absolute;
+    top: 0px;
+    right: 10px;
+    font-size: 60px;
+    height: 68px;
+    padding-top: 0px;
+}
+
+@media screen and (max-height: 450px) {
+  .overlay a {font-size: 20px}
+  .overlay .closebtn {
+    font-size: 40px;
+    top: 0;
+    right: 35px;
+  }
+}
+
+.btn {
+    position: relative;
+
+    width: 200px;
+    height: 50px;
+
+    display: block;
+    margin: 10px auto;
+    padding: 0;
+
+    overflow: hidden;
+
+    border-width: 0;
+    outline: none;
+    border-radius: 2px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+
+    background-color: #212121;
+    color: white;
+
+    transition: background-color .3s;
+}
+
+.btn:hover, .btn:focus {
+    background-color: #707070;
+}
+
+.btn > * {
+    position: relative;
+}
+
+.btn span {
+  display: block;
+  padding: 12px 24px;
+}
+
+.btn:before {
+  content: "";
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  display: block;
+  width: 0;
+  padding-top: 0;
+
+  border-radius: 100%;
+
+  background-color: rgba(236, 240, 241, .3);
+
+  -webkit-transform: translate(-50%, -50%);
+  -moz-transform: translate(-50%, -50%);
+  -ms-transform: translate(-50%, -50%);
+  -o-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}
+
+.btn:active:before {
+  width: 120%;
+  padding-top: 120%;
+
+  /*transition: width .2s ease-out, padding-top .2s ease-out;*/
+}
+
+.btnDisabled {
+
+    background-color: #414141;
+    color: #ecf0f1;
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+}
+
+/* Styles, not important */
+*, *:before, *:after {
+  box-sizing: border-box;
+}
