@@ -1,0 +1,33 @@
+html {
+    font-family: 'Roboto', sans-serif;
+}
+
+body {
+    background-color: #f0f0f0;
+    margin: 0px;
+    overflow: hidden;
+}
+
+.menuBtn {
+    font-size:30px;
+    cursor:pointer;
+    color: white;
+    position: fixed !important;
+    top: 2px;
+    left: 5px;
+    z-index: 1;
+    vertical-align: middle;
+    background-color: rgba(0,0,0,0.3) !important
+}
+
+.menuBtnOrder {
+    font-size:30px;
+    cursor:pointer;
+    color: white;
+    position: fixed !important;
+    top: 2px;
+    right: 5px;
+    z-index: 1;
+    vertical-align: middle;
+    background-color: rgba(0,0,0,0.3) !important
+}
