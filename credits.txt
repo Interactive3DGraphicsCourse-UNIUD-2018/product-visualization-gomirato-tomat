@@ -1,5 +1,0 @@
-envMap
-https://www.eso.org/public/images/list/4/?search=360+degree+panorama
-
-Model
-https://sketchfab.com/models/14c0ed3f9a0f46bdb375a7cbca431396
