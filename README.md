@@ -16,3 +16,7 @@ Le fonti utilizzate per la realizzazione del progetto sono linkate nel file cred
 - Inserimento luci, EM e IEM
 - implementazione shaders
 - Realizzazione struttura del sito e inserimento scena
+
+## Aspetti/funzioni da implementare
+- aggiungere pulsante e relativa funzione per cambiare sfondo;
+- aggiungere restrizione massimo un menu attivo per volta;
