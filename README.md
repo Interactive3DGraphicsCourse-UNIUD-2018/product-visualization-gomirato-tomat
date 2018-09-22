@@ -2,6 +2,7 @@
 Il progetto simula un possibile configuratore online per l'acquisto di un casco iconico come quello di Kylo Ren, dal mondo di Star Wars. Si possono modificare a piacimento le quattro parti fondamentali del casco, attraverso un menu a scomparsa, che fornisce le varie opzioni di personalizzazione e i materiali a disposizione.
 
 ![classic](img/screen1.png)
+![leather](img/screen2.png)
 
 
 # Struttura del progetto
