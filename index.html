@@ -140,8 +140,10 @@
 
 			uniform vec3 pointLightPosition1; // in world space
       uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 pointLightPosition3; // in world space
 			uniform vec3 clight1;
       uniform vec3 clight2;
+			uniform vec3 clight3;
 
 			uniform sampler2D baseColor;      //used as specular color
       uniform sampler2D roughnessMap;
@@ -220,6 +222,8 @@
 					(4.0*nDotl1*nDotv);
 				vec3 outRadiance1 = PI* clight1 * nDotl1 * BRDF1;
 
+
+
         // about light 2
         vec4 lPosition2 = viewMatrix * vec4( pointLightPosition2, 1.0 );
         vec3 l2 = normalize(lPosition2.xyz - vPosition.xyz);
@@ -234,6 +238,21 @@
           (4.0*nDotl2*nDotv);
         vec3 outRadiance2 = PI* clight2 * nDotl2 * BRDF2;
 
+
+				// about light 3
+        vec4 lPosition3 = viewMatrix * vec4( pointLightPosition3, 1.0 );
+        vec3 l3 = normalize(lPosition3.xyz - vPosition.xyz);
+        vec3 h3 = normalize(l3 + v);
+        float nDotl3 = max(dot( n, l3 ),0.000001);
+				float l3Doth3 = max(dot( l3, h3 ),0.000001);
+				float nDoth3 = max(dot( n, h3 ),0.000001);
+				float vDoth3 = max(dot( v, h3 ),0.000001);
+
+        vec3 fresnel_3 = FSchlick(l3Doth3);
+        vec3 BRDF3 = fresnel_3*GSmith(nDotv,nDotl3)*DGGX(nDoth3,roughness*roughness)/
+          (4.0*nDotl3*nDotv);
+        vec3 outRadiance3 = PI* clight3 * nDotl3 * BRDF3;
+
         // about environment light
 				vec3 worldN = inverseTransformDirection( n, viewMatrix );
 				vec3 worldV = cameraPosition - wPosition ;
@@ -245,7 +264,7 @@
         vec3 outRadianceEnv = envLight * BRDF_Specular_GGX_Environment(n, v, cspec, roughness);
 
         // total light
-        vec3 outRadiance = outRadiance1 + outRadiance2 + outRadianceEnv;
+        vec3 outRadiance = outRadiance1 + outRadiance2 + outRadiance3 + outRadianceEnv;
 				// gamma encode the final value
 				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
 			}
@@ -262,9 +281,11 @@
 			varying vec2 uVv;
 
 			uniform vec3 pointLightPosition1; // in world space
-			uniform vec3 pointLightPosition2; // in world space
+      uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 pointLightPosition3; // in world space
 			uniform vec3 clight1;
-			uniform vec3 clight2;
+      uniform vec3 clight2;
+			uniform vec3 clight3;
 
 			uniform sampler2D baseColor;      //used as specular color
 			uniform sampler2D roughnessMap;
@@ -360,7 +381,22 @@
 					(4.0*nDotl2*nDotv);
 				vec3 outRadiance_2 = PI* clight2 * nDotl2 * BRDF_2;
 
-				vec3 outRadiance = (envLight * cspec * cdiff) +  outRadiance_1 +  outRadiance_2;
+				// about light 3
+				vec4 lPosition3 = viewMatrix * vec4(pointLightPosition3, 1.0);
+				vec3 l3 = normalize(lPosition3.xyz - vPosition.xyz);
+				vec3 h3 = normalize(v + l3);
+				//small quantity to prevent division by 0
+				float nDotl3 = max(dot(n, l3), 0.000001);
+				float nDoth3 = max(dot(n, h3), 0.000001);
+				float l3Doth3 = max(dot(l3, h3), 0.000001);
+				float vDoth3 = max(dot(v, h3), 0.000001);
+
+				vec3 fresnel3 = FSchlick(l3Doth3);
+				vec3 BRDF_3 = (vec3(1.0)-fresnel3)*cdiff/PI + fresnel3*GSmith(nDotv,nDotl3)*DGGX(nDoth3,roughness*roughness)/
+					(4.0*nDotl3*nDotv);
+				vec3 outRadiance_3 = PI* clight3 * nDotl3 * BRDF_3;
+
+				vec3 outRadiance = (envLight * cspec * cdiff) +  outRadiance_1 +  outRadiance_2 + outRadiance_3;
 				// gamma encode the final value
 				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
 			}
@@ -380,8 +416,10 @@
 			uniform vec2 normalScale;
 			uniform vec3 pointLightPosition1; // in world space
       uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 pointLightPosition3; // in world space
 			uniform vec3 clight1;
       uniform vec3 clight2;
+			uniform vec3 clight3;
 
 			uniform sampler2D baseColor;      //used as specular color
       uniform sampler2D roughnessMap;
@@ -502,7 +540,23 @@
 					(4.0*nDotl2*nDotv);
 				vec3 outRadiance_2 = PI* clight2 * nDotl2 * BRDF_2;
 
-				vec3 outRadiance = (envLight * cdiff) +  outRadiance_1 +  outRadiance_2;
+
+				// about light 3
+				vec4 lPosition3 = viewMatrix * vec4(pointLightPosition3, 1.0);
+				vec3 l3 = normalize(lPosition3.xyz - vPosition.xyz);
+				vec3 h3 = normalize(v + l3);
+				//small quantity to prevent division by 0
+				float nDotl3 = max(dot(n, l3), 0.000001);
+				float nDoth3 = max(dot(n, h3), 0.000001);
+				float l3Doth3 = max(dot(l3, h3), 0.000001);
+				float vDoth3 = max(dot(v, h3), 0.000001);
+
+				vec3 fresnel3 = FSchlick(l3Doth3);
+				vec3 BRDF_3 = (vec3(1.0)-fresnel3)*cdiff/PI + fresnel3*GSmith(nDotv,nDotl3)*DGGX(nDoth3,roughness*roughness)/
+					(4.0*nDotl3*nDotv);
+				vec3 outRadiance_3 = PI* clight3 * nDotl3 * BRDF_3;
+
+				vec3 outRadiance = (envLight * cdiff) +  outRadiance_1 +  outRadiance_2 + outRadiance_3;
 				// gamma encode the final value
 				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
 			}
@@ -520,8 +574,10 @@
 			uniform vec2 normalScale;
 			uniform vec3 pointLightPosition1; // in world space
       uniform vec3 pointLightPosition2; // in world space
+			uniform vec3 pointLightPosition3; // in world space
 			uniform vec3 clight1;
       uniform vec3 clight2;
+			uniform vec3 clight3;
 
 			uniform sampler2D baseColor;      //used as specular color
       uniform sampler2D roughnessMap;
@@ -645,7 +701,22 @@
 					(4.0*nDotl2*nDotv);
 				vec3 outRadiance_2 = PI* clight2 * nDotl2 * BRDF_2;
 
-				vec3 outRadiance = (envLight * cdiff) +  outRadiance_1 +  outRadiance_2;
+				// about light 3
+				vec4 lPosition3 = viewMatrix * vec4(pointLightPosition3, 1.0);
+				vec3 l3 = normalize(lPosition3.xyz - vPosition.xyz);
+				vec3 h3 = normalize(v + l3);
+				//small quantity to prevent division by 0
+				float nDotl3 = max(dot(n, l3), 0.000001);
+				float nDoth3 = max(dot(n, h3), 0.000001);
+				float l3Doth3 = max(dot(l3, h3), 0.000001);
+				float vDoth3 = max(dot(v, h3), 0.000001);
+
+				vec3 fresnel3 = FSchlick(l3Doth3);
+				vec3 BRDF_3 = (vec3(1.0)-fresnel3)*cdiff/PI + fresnel3*GSmith(nDotv,nDotl3)*DGGX(nDoth3,roughness*roughness)/
+					(4.0*nDotl3*nDotv);
+				vec3 outRadiance_3 = PI* clight3 * nDotl3 * BRDF_3;
+
+				vec3 outRadiance = (envLight * cdiff) +  outRadiance_1 +  outRadiance_2 + outRadiance_3;
 				// gamma encode the final value
 				gl_FragColor = vec4(pow( outRadiance, vec3(1.0/2.2)), 1.0);
 			}
@@ -719,8 +790,10 @@
 				textureRepeat: {type: "v2", value: new THREE.Vector2(8,8)},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap},
 				aoMap: {type: "t", value: loadTexture(carbPath + "aoMap.png")}
@@ -742,8 +815,10 @@
 				textureRepeat: {type: "v2", value: new THREE.Vector2(8,8)},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -60)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap},
 				aoMap: {type: "t", value: loadTexture(leatherPath + "aoMap.jpg")}
@@ -760,8 +835,10 @@
         roughnessMap: {type: "t", value: loadTexture(coPath + "roughness.png")},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
-				clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
+	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap}
       }
@@ -775,8 +852,10 @@
         roughnessMap: {type: "t", value: loadTexture(crPath + "roughness.png")},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
-				clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
+	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap}
 			}
@@ -791,8 +870,10 @@
         roughnessMap: {type: "t", value: loadTexture(crPath + "roughness.png")},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
-				clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
+	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap}
 			}
@@ -805,10 +886,12 @@
 	    var goldUniforms = {
 	      baseColor: {type: "t", value: loadTexture(gPath + "baseColor.jpg")},
 	      roughnessMap: {type: "t", value: loadTexture(gPath + "roughness.jpg")},
-	      pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
+				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
-				clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
+	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
 	      envMap: {type: "t", value: envMap},
 	      iEM: {type: "t", value: irradianceMap}
 	    }
@@ -831,8 +914,10 @@
 				textureRepeat: {type: "v2", value: new THREE.Vector2(5,5)},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap}
 	    }
@@ -848,12 +933,14 @@
         normalMap: {type: "t", value: loadTexture(camoPath + "normalMap.jpg")},
         roughnessMap: {type: "t", value: loadTexture(camoPath + "roughnessMap.jpg")},
 				metalnessMap: {type: "t", value: loadTexture(camoPath + "metallic.jpg")},
-				normalScale: {type: "v2", value: new THREE.Vector2(1,1)},
+				normalScale: {type: "v2", value: new THREE.Vector2(2,2)},
 				textureRepeat: {type: "v2", value: new THREE.Vector2(3,3)},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap},
 				aoMap: {type: "t", value: loadTexture(camoPath + "roughnessMap.jpg")}
@@ -872,8 +959,10 @@
 				textureRepeat: {type: "v2", value: new THREE.Vector2(4,4)},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap},
 				aoMap: {type: "t", value: loadTexture(camoPath + "roughnessMap.jpg")}
@@ -881,15 +970,17 @@
 
       var flower = new THREE.ShaderMaterial({uniforms: floUniforms, vertexShader: vs, fragmentShader: fs_ins, extensions: materialExtensions});
 
-
+			// plastica nera
 			var plasticUniforms = {
 				baseColor: {type: "t", value: loadTexture(camoPath + "plastic.jpg")},
         roughnessMap: {type: "t", value: loadTexture(camoPath + "plastic.jpg")},
 				metalnes: {type: "f", value: 0.0},
 				pointLightPosition1: {type: "v3", value: new THREE.Vector3(20, 20, -20)},
 	      pointLightPosition2: {type: "v3", value: new THREE.Vector3(-20, 20, 20)},
+				pointLightPosition3: {type: "v3", value: new THREE.Vector3(-20, 0, -20)},
 	      clight1: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
 	      clight2: {type: "v3", value: new THREE.Vector3(0.1,0.1,0.1)},
+				clight3: {type: "v3", value: new THREE.Vector3(0.01,0.01,0.01)},
         envMap: {type: "t", value: envMap},
         iEM: {type: "t", value: irradianceMap}
       }
